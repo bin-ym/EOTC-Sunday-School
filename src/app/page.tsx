@@ -1,258 +1,222 @@
 // src/app/page.tsx
-'use client';
+"use client";
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import AttendanceTable from '../components/AttendanceTable';
 
 interface Student {
-  id: string;
-  ID_Number: string;
+  _id: string;
+  Unique_ID: string;
   First_Name: string;
-  Last_Name: string;
-  Spiritual_Name: string;
+  Father_Name: string;
+  Grandfather_Name: string;
+  Mothers_Name: string;
+  Christian_Name: string;
   Phone_Number: string;
   Age: number;
   Sex: string;
   Class: string;
   Occupation: string;
-  Education_Background: string;
+  Educational_Background?: string;
   Address: string;
   Academic_Year: string;
+  Grade: string;
 }
 
 interface Attendance {
   studentId: string;
-  date: string; // Gregorian date (ISO string, YYYY-MM-DD)
+  date: string;
   present: boolean;
   hasPermission: boolean;
 }
 
 export default function Home() {
-  // Sample student data (replace with MongoDB later)
-  const [students] = useState<Student[]>([
-    {
-      id: '1',
-      ID_Number: '250001',
-      First_Name: 'John',
-      Last_Name: 'Doe',
-      Spiritual_Name: 'Yohannes',
-      Phone_Number: '0912345678',
-      Age: 15,
-      Sex: 'Male',
-      Class: 'Grade 1',
-      Occupation: 'Student',
-      Education_Background: '9-12',
-      Address: 'Addis Ababa',
-      Academic_Year: '2025',
-    },
-    {
-      id: '2',
-      ID_Number: '250002',
-      First_Name: 'Mary',
-      Last_Name: 'Smith',
-      Spiritual_Name: 'Kidist',
-      Phone_Number: '0923456789',
-      Age: 17,
-      Sex: 'Female',
-      Class: 'Grade 2',
-      Occupation: 'Student',
-      Education_Background: '9-12',
-      Address: 'Addis Ababa',
-      Academic_Year: '2025',
-    },
-    {
-      id: '3',
-      ID_Number: '250003',
-      First_Name: 'ቢንያም',
-      Last_Name: 'ታገል',
-      Spiritual_Name: 'Yohannes',
-      Phone_Number: '0912345678',
-      Age: 15,
-      Sex: 'Male',
-      Class: 'Grade 1',
-      Occupation: 'Student',
-      Education_Background: '9-12',
-      Address: 'Addis Ababa',
-      Academic_Year: '2025',
-    },
-  ]);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedDate] = useState<string>('2025-06-08'); // Fixed to today
+  const { status } = useSession();
+  const [students, setStudents] = useState<Student[] | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedDate] = useState("2025-06-08");
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [isSunday, setIsSunday] = useState(false);
 
-  // Check if today is Sunday
   useEffect(() => {
-    const date = new Date(selectedDate);
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    setIsSunday(dayOfWeek === 0);
-  }, [selectedDate]);
+    if (status === "unauthenticated") {
+      window.location.href = "/api/auth/signin";
+    } else if (status === "authenticated") {
+      setIsSunday(new Date(selectedDate).getDay() === 0);
+      fetch("/api/students")
+        .then((res) => res.json())
+        .then((data) => {
+          console.log('Fetched students:', data); // Debugging
+          setStudents(data);
+        })
+        .catch((error) => {
+          console.error('Fetch students error:', error); // Debugging
+          setStudents([]);
+        });
+    }
+  }, [status]);
 
-  // Toggle attendance (uncheck permission if present is checked)
   const toggleAttendance = (studentId: string) => {
-    if (!isSunday) {
-      alert('Attendance can only be marked on Sundays');
-      return;
-    }
-    const existingRecord = attendance.find(
-      (rec) => rec.studentId === studentId && rec.date === selectedDate
+    if (!isSunday) return alert("Attendance can only be marked on Sundays");
+    const record = attendance.find(
+      (r) => r.studentId === studentId && r.date === selectedDate
     );
-    if (existingRecord) {
-      setAttendance(
-        attendance.map((rec) =>
-          rec.studentId === studentId && rec.date === selectedDate
-            ? { ...rec, present: !rec.present, hasPermission: false }
-            : rec
-        )
-      );
-    } else {
-      setAttendance([
-        ...attendance,
-        { studentId, date: selectedDate, present: true, hasPermission: false },
-      ]);
-    }
+    setAttendance(
+      record
+        ? attendance.map((r) =>
+            r.studentId === studentId && r.date === selectedDate
+              ? { ...r, present: !r.present, hasPermission: false }
+              : r
+          )
+        : [
+            ...attendance,
+            {
+              studentId,
+              date: selectedDate,
+              present: true,
+              hasPermission: false,
+            },
+          ]
+    );
   };
 
-  // Toggle permission (uncheck present if permission is checked)
   const togglePermission = (studentId: string) => {
-    if (!isSunday) {
-      alert('Permission can only be marked on Sundays');
-      return;
-    }
-    const existingRecord = attendance.find(
-      (rec) => rec.studentId === studentId && rec.date === selectedDate
+    if (!isSunday) return alert("Permission can only be marked on Sundays");
+    const record = attendance.find(
+      (r) => r.studentId === studentId && r.date === selectedDate
     );
-    if (existingRecord) {
-      setAttendance(
-        attendance.map((rec) =>
-          rec.studentId === studentId && rec.date === selectedDate
-            ? { ...rec, hasPermission: !rec.hasPermission, present: false }
-            : rec
-        )
-      );
-    } else {
-      setAttendance([
-        ...attendance,
-        { studentId, date: selectedDate, present: false, hasPermission: true },
-      ]);
-    }
+    setAttendance(
+      record
+        ? attendance.map((r) =>
+            r.studentId === studentId && r.date === selectedDate
+              ? { ...r, hasPermission: !r.hasPermission, present: false }
+              : r
+          )
+        : [
+            ...attendance,
+            {
+              studentId,
+              date: selectedDate,
+              present: false,
+              hasPermission: true,
+            },
+          ]
+    );
   };
 
-  // Generate Excel file
-  const generateExcelFile = () => {
-    // Prepare data for Excel
-    const data = students.map((student) => {
-      const record = attendance.find(
-        (rec) => rec.studentId === student.id && rec.date === selectedDate
-      );
-      let status = 'Absent';
-      if (record) {
-        status = record.present ? 'Present' : record.hasPermission ? 'Permission' : 'Absent';
-      }
-      return {
-        ID_Number: student.ID_Number,
-        First_Name: student.First_Name,
-        Last_Name: student.Last_Name,
-        Class: student.Class,
-        Attendance_Status: status,
-        Date: selectedDate,
-      };
-    });
-
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
-
-    // Generate Excel file
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const fileName = `Attendance_${selectedDate}.xlsx`;
-
-    // Download file
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, fileName);
+  const generateExcel = () => {
+    if (!students) return;
+    const data = students.map((student) => ({
+      Unique_ID: student.Unique_ID,
+      First_Name: student.First_Name,
+      Father_Name: student.Father_Name,
+      Class: student.Class,
+      Status: attendance.find(
+        (r) => r.studentId === student._id && r.date === selectedDate
+      )?.present
+        ? "Present"
+        : attendance.find(
+            (r) => r.studentId === student._id && r.date === selectedDate
+          )?.hasPermission
+        ? "Permission"
+        : "Absent",
+      Date: selectedDate,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    saveAs(
+      new Blob([buffer], { type: "application/octet-stream" }),
+      `Attendance_${selectedDate}.xlsx`
+    );
   };
 
-  // Handle submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSunday) {
-      alert('Attendance can only be submitted on Sundays');
-      return;
-    }
-    const hasAttendance = attendance.some(
-      (rec) => rec.date === selectedDate && (rec.present || rec.hasPermission)
-    );
-    if (!hasAttendance) {
-      alert('Please mark at least one student as Present or with Permission');
-      return;
-    }
-    console.log('Submitted Attendance:', attendance);
-    alert('Attendance submitted successfully!');
-    generateExcelFile();
+    if (!isSunday) return alert("Attendance can only be submitted on Sundays");
+    if (
+      !attendance.some(
+        (r) => r.date === selectedDate && (r.present || r.hasPermission)
+      )
+    )
+      return alert(
+        "Please mark at least one student as Present or with Permission"
+      );
+    generateExcel();
+    alert("Attendance submitted successfully!");
     setAttendance([]);
   };
 
-  // Get unique classes for filter
-  const classOptions = [...new Set(students.map((student) => student.Class))];
+  const filteredStudents =
+    students?.filter(
+      (student) =>
+        (selectedClass === "" || student.Class === selectedClass) &&
+        (
+          (student.Unique_ID || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (student.First_Name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (student.Father_Name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (student.Class || "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    ) || [];
 
-  // Search and class filter
-  const filteredStudents = students.filter(
-    (student) =>
-      (selectedClass === '' || student.Class === selectedClass) &&
-      (student.ID_Number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.First_Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.Last_Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.Class.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const classOptions = [...new Set(students?.map((s) => s.Class) || [])];
+
+  if (status === "loading") {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="bg-white shadow-lg rounded-lg p-6">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Attendance Management</h1>
-
-      {/* Date Display and Search Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">
+        Attendance Management
+      </h1>
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Attendance Date
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date
           </label>
-          <p className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+          <p className="p-3 border border-gray-300 rounded-lg bg-gray-50">
             June 8, 2025
           </p>
           {!isSunday && (
             <p className="text-red-500 text-sm mt-1">
-              Attendance can only be marked on Sundays.
+              Attendance can only be marked on Sundays
             </p>
           )}
         </div>
         <div>
-          <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-            Search Students
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Search
           </label>
           <input
             type="text"
-            id="search"
             placeholder="Search by ID, Name, or Class"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-3 border border-gray-300 rounded-lg"
           />
         </div>
       </div>
-
-      {/* Class Filter and Submit Button */}
-      <form onSubmit={handleSubmit} className="mb-6 flex justify-between items-end">
-        <div className="w-full md:w-1/2">
-          <label htmlFor="classFilter" className="block text-sm font-medium text-gray-700 mb-2">
+      <form
+        onSubmit={handleSubmit}
+        className="mb-6 flex justify-between items-end"
+      >
+        <div className="w-1/2">
+          <label
+            htmlFor="classFilter"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Filter by Class
           </label>
           <select
             id="classFilter"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-3 w-full border-gray-300 rounded-lg"
           >
             <option value="">All Classes</option>
             {classOptions.map((className) => (
@@ -264,58 +228,19 @@ export default function Home() {
         </div>
         <button
           type="submit"
-          className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition duration-200"
+          className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700"
         >
-          Submit Attendance
+          Submit
         </button>
       </form>
-
-      {/* Student List with Attendance */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-gray-200">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border border-gray-200 p-3 text-left text-gray-700">ID Number</th>
-              <th className="border border-gray-200 p-3 text-left text-gray-700">Name</th>
-              <th className="border border-gray-200 p-3 text-left text-gray-700">Class</th>
-              <th className="border border-gray-200 p-3 text-center text-gray-700">Present</th>
-              <th className="border border-gray-200 p-3 text-center text-gray-700">Permission</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student) => {
-              const attendanceRecord = attendance.find(
-                (rec) => rec.studentId === student.id && rec.date === selectedDate
-              );
-              return (
-                <tr key={student.id} className="hover:bg-gray-50">
-                  <td className="border border-gray-200 p-3">{student.ID_Number}</td>
-                  <td className="border border-gray-200 p-3">{`${student.First_Name} ${student.Last_Name}`}</td>
-                  <td className="border border-gray-200 p-3">{student.Class}</td>
-                  <td className="border border-gray-200 p-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={attendanceRecord?.present || false}
-                      onChange={() => toggleAttendance(student.id)}
-                      disabled={!isSunday}
-                      className="h-5 w-5 rounded border-gray-300 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="border border-gray-200 p-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={attendanceRecord?.hasPermission || false}
-                      onChange={() => togglePermission(student.id)}
-                      disabled={!isSunday}
-                      className="h-5 w-5 rounded border-gray-300 focus:ring-blue-500"
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <AttendanceTable
+        students={filteredStudents}
+        attendance={attendance}
+        selectedDate={selectedDate}
+        isSunday={isSunday}
+        toggleAttendance={toggleAttendance}
+        togglePermission={togglePermission}
+      />
     </div>
   );
 }
