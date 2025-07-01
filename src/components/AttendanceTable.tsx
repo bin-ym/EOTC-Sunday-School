@@ -10,37 +10,6 @@ interface AttendanceTableProps {
   togglePermission: (studentId: string) => void;
 }
 
-interface Student {
-  _id: string;
-  Unique_ID: string;
-  First_Name: string;
-  Father_Name: string;
-  Grandfather_Name: string;
-  Mothers_Name: string;
-  Christian_Name: string;
-  DOB_Date: string;
-  DOB_Month: string;
-  DOB_Year: string;
-  Age: number;
-  Sex: string;
-  Phone_Number: string;
-  Class: string;
-  Occupation: string;
-  School?: string;
-  Educational_Background?: string;
-  Place_of_Work?: string;
-  Address: string;
-  Academic_Year: string;
-  Grade: string;
-}
-
-interface Attendance {
-  studentId: string;
-  date: string;
-  present: boolean;
-  hasPermission: boolean;
-}
-
 export default function AttendanceTable({
   students,
   attendance,
@@ -87,7 +56,7 @@ export default function AttendanceTable({
             return (
               <tr key={student._id} className="hover:bg-gray-50">
                 <td className="border p-3">{student.Unique_ID}</td>
-                <td className="border p-3">{`${student.First_Name} ${student.Father_Name}`}</td>
+                <td className="border p-3">{`${student.First_Name} ${student.Father_Name} ${student.Grandfather_Name}`}</td>
                 <td className="border p-3">{student.Grade}</td>
                 <td className="border p-3 text-center">
                   <input
